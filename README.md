@@ -1,2 +1,7 @@
 # Parlant1
-cours git ub avec parlant
+
+## cours test
+
+exercice de cours
+
+voilà voilà *gras* 
