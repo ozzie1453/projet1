@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulation D3.js : Absorption & Gravité Croissante</title>
+
+    <!-- Chargement de D3.js v7 via CDN -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- ==================== DEBUT STYLES CSS ==================== -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0b0e14;
+            color: #e0e6ed;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        h1 {
+            color: #f1c40f;
+            margin-bottom: 15px;
+            font-size: 24px;
+            text-shadow: 0 0 10px rgba(241, 196, 15, 0.4);
+        }
+
+        .main-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .controls {
+            background: #151d2a;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 300px;
+            max-height: 540px;
+            overflow-y: auto;
+            border: 1px solid #2c3e50;
+        }
+
+        .section-title {
+            font-weight: bold;
+            color: #f1c40f;
+            border-bottom: 1px solid #f1c40f;
+            padding-bottom: 4px;
+            margin-top: 5px;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .control-group label {
+            font-weight: bold;
+            font-size: 12px;
+            color: #abb2bf;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #abb2bf;
+            cursor: pointer;
+        }
+
+        input[type=range] {
+            cursor: pointer;
+            width: 100%;
+            accent-color: #f1c40f;
+        }
+
+        button {
+            background-color: #f1c40f;
+            color: #0b0e14;
+            border: none;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 5px;
+        }
+
+        button:hover {
+            background-color: #f39c12;
+            box-shadow: 0 0 8px rgba(243, 156, 18, 0.6);
+        }
+
+        /* Surface SVG */
+        #viz-container {
+            background-color: #05070a;
+            border: 2px solid #1f2937;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+
+        /* Styles D3 SVG */
+        .contour-path {
+            opacity: 0.35;
+            stroke: none;
+        }
+
+        .voronoi-cell {
+            fill: rgba(46, 204, 113, 0.03);
+            stroke: rgba(46, 204, 113, 0.2);
+            stroke-width: 1px;
+            stroke-dasharray: 2,4;
+        }
+
+        .sun-point {
+            fill: #f1c40f;
+            stroke: #f39c12;
+            stroke-width: 3px;
+            filter: drop-shadow(0px 0px 10px #f1c40f);
+            transition: r 0.2s ease-out;
+        }
+
+        .planet-point {
+            fill: #2ecc71;
+            stroke: #27ae60;
+            stroke-width: 1.5px;
+            filter: drop-shadow(0px 0px 4px #2ecc71);
+        }
+    </style>
+    <!-- ==================== FIN STYLES CSS ==================== -->
+</head>
+<body>
+
+    <h1>Absorption des Points & Gravité Croissante</h1>
+
+    <div class="main-container">
+        <!-- ==================== DEBUT PANNEAU DE CONTRÔLE ==================== -->
+        <div class="controls">
+            <button id="playBtn">Réinitialiser la simulation</button>
+
+            <!-- Population -->
+            <div class="section-title">Population</div>
+            <div class="control-group">
+                <label>Points Jaunes (Attracteurs) : <span id="sunVal">1</span></label>
+                <input type="range" id="sunSlider" min="1" max="5" value="1">
+            </div>
+            <div class="control-group">
+                <label>Points Verts (Proies) : <span id="planetVal">50</span></label>
+                <input type="range" id="planetSlider" min="10" max="200" value="50">
+            </div>
+
+            <!-- Forces -->
+            <div class="section-title">Physique & Absorption</div>
+            <div class="control-group">
+                <label>Attraction Initiale (Jaune) : <span id="attractionVal">100</span></label>
+                <input type="range" id="attractionSlider" min="10" max="300" value="100">
+            </div>
+            <div class="control-group">
+                <label>Gain de Gravité / Absorption : <span id="growthVal">20</span></label>
+                <input type="range" id="growthSlider" min="5" max="80" value="20">
+            </div>
+            <div class="control-group">
+                <label>Rejet entre Verts (Rebond) : <span id="bounceVal">1.2</span></label>
+                <input type="range" id="bounceSlider" min="0.1" max="3.0" step="0.1" value="1.2">
+            </div>
+            <div class="control-group">
+                <label>Inertie / Friction : <span id="frictionVal">0.08</span></label>
+                <input type="range" id="frictionSlider" min="0.01" max="0.5" step="0.01" value="0.08">
+            </div>
+
+            <!-- Heatmap -->
+            <div class="section-title">Champs de Densité</div>
+            <div class="control-group">
+                <label>Flou Heatmap : <span id="bandwidthVal">35</span></label>
+                <input type="range" id="bandwidthSlider" min="10" max="80" value="35">
+            </div>
+            <div class="control-group">
+                <label>Iso-courbes : <span id="thresholdsVal">15</span></label>
+                <input type="range" id="thresholdsSlider" min="4" max="30" value="15">
+            </div>
+
+            <!-- Visibilité -->
+            <div class="section-title">Visualisation</div>
+            <label class="checkbox-group">
+                <input type="checkbox" id="toggleHeatmap" checked> Heatmap de Densité
+            </label>
+            <label class="checkbox-group">
+                <input type="checkbox" id="toggleVoronoi" checked> Maillage Voronoï
+            </label>
+        </div>
+        <!-- ==================== FIN PANNEAU DE CONTRÔLE ==================== -->
+
+        <!-- Zone d'affichage SVG -->
+        <div id="viz-container"></div>
+    </div>
+
+    <!-- ==================== DEBUT JAVASCRIPT D3.JS ==================== -->
+    <script>
+        const width = 650;
+        const height = 550;
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // --- DOM Elements ---
+        const playBtn = document.getElementById('playBtn');
+        const sunSlider = document.getElementById('sunSlider');
+        const planetSlider = document.getElementById('planetSlider');
+        const attractionSlider = document.getElementById('attractionSlider');
+        const growthSlider = document.getElementById('growthSlider');
+        const bounceSlider = document.getElementById('bounceSlider');
+        const frictionSlider = document.getElementById('frictionSlider');
+        const bandwidthSlider = document.getElementById('bandwidthSlider');
+        const thresholdsSlider = document.getElementById('thresholdsSlider');
+        const toggleHeatmap = document.getElementById('toggleHeatmap');
+        const toggleVoronoi = document.getElementById('toggleVoronoi');
+
+        // --- Scene SVG D3 ---
+        const svg = d3.select("#viz-container")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        const layerHeatmap = svg.append("g").attr("class", "layer-heatmap");
+        const layerVoronoi = svg.append("g").attr("class", "layer-voronoi");
+        const layerSun = svg.append("g").attr("class", "layer-sun");
+        const layerPlanet = svg.append("g").attr("class", "layer-planet");
+
+        let sunNodes = [];
+        let planetNodes = [];
+        let simulation = null;
+
+        function setupSliderListeners() {
+            const sliders = [
+                [sunSlider, 'sunVal'], [planetSlider, 'planetVal'],
+                [attractionSlider, 'attractionVal'], [growthSlider, 'growthVal'],
+                [bounceSlider, 'bounceVal'], [frictionSlider, 'frictionVal'],
+                [bandwidthSlider, 'bandwidthVal'], [thresholdsSlider, 'thresholdsVal']
+            ];
+
+            sliders.forEach(([slider, valId]) => {
+                slider.oninput = () => {
+                    document.getElementById(valId).textContent = slider.value;
+                    updateLiveParameters();
+                };
+            });
+
+            toggleHeatmap.onchange = () => layerHeatmap.style("display", toggleHeatmap.checked ? "block" : "none");
+            toggleVoronoi.onchange = () => layerVoronoi.style("display", toggleVoronoi.checked ? "block" : "none");
+        }
+
+        // 1. Heatmap de densité
+        function drawDensityMap() {
+            layerHeatmap.selectAll("*").remove();
+            const allNodes = [...sunNodes, ...planetNodes];
+            if (allNodes.length === 0) return;
+
+            const densityData = d3.contourDensity()
+                .x(d => d.x)
+                .y(d => d.y)
+                .size([width, height])
+                .bandwidth(parseFloat(bandwidthSlider.value))
+                .thresholds(parseInt(thresholdsSlider.value))
+                (allNodes);
+
+            const colorScale = d3.scaleSequential(d3.interpolateMagma)
+                .domain([0, d3.max(densityData, d => d.value) || 1]);
+
+            layerHeatmap.selectAll("path")
+                .data(densityData)
+                .join("path")
+                .attr("class", "contour-path")
+                .attr("d", d3.geoPath())
+                .attr("fill", d => colorScale(d.value));
+        }
+
+        // 2. Voronoï des points verts
+        function updateVoronoi() {
+            if (planetNodes.length === 0 || !toggleVoronoi.checked) {
+                layerVoronoi.selectAll("path").remove();
+                return;
+            }
+
+            const delaunay = d3.Delaunay.from(planetNodes, d => d.x, d => d.y);
+            const voronoi = delaunay.voronoi([0, 0, width, height]);
+
+            layerVoronoi.selectAll("path")
+                .data(planetNodes)
+                .join("path")
+                .attr("class", "voronoi-cell")
+                .attr("d", (d, i) => voronoi.renderCell(i));
+        }
+
+        // 3. Détection des chocs (Rejet entre verts & Absorption par le point jaune)
+        function checkCollisionsAndAbsorb() {
+            const growthFactor = parseFloat(growthSlider.value);
+            const bounceForce = parseFloat(bounceSlider.value);
+            const planetRadius = 6;
+            const absorbedIndices = new Set();
+
+            // A. Test de Collision Verts vs Points Jaunes (Absorption)
+            for (let i = 0; i < planetNodes.length; i++) {
+                const planet = planetNodes[i];
+
+                for (let j = 0; j < sunNodes.length; j++) {
+                    const sun = sunNodes[j];
+
+                    const dx = planet.x - sun.x;
+                    const dy = planet.y - sun.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    // Si le point vert touche le point jaune
+                    if (distance < sun.r + planetRadius) {
+                        absorbedIndices.add(i);
+
+                        // Augmenter le rayon du point jaune
+                        sun.r += 1.2;
+                        // Augmenter la force d'attraction du point jaune
+                        sun.attraction += growthFactor;
+                        break;
+                    }
+                }
+            }
+
+            // Supprimer les points verts absorbés
+            if (absorbedIndices.size > 0) {
+                planetNodes = planetNodes.filter((_, idx) => !absorbedIndices.has(idx));
+
+                // Redessiner les points verts et le point jaune grandi
+                layerPlanet.selectAll("circle")
+                    .data(planetNodes, d => d.id)
+                    .exit()
+                    .remove();
+
+                layerSun.selectAll("circle")
+                    .data(sunNodes)
+                    .attr("r", d => d.r);
+
+                // Mettre à jour les nœuds dans le moteur d3-force
+                simulation.nodes([...sunNodes, ...planetNodes]);
+                updateLiveParameters();
+            }
+
+            // B. Rejet / Rebond physique entre points verts restants
+            for (let i = 0; i < planetNodes.length; i++) {
+                for (let j = i + 1; j < planetNodes.length; j++) {
+                    const nodeA = planetNodes[i];
+                    const nodeB = planetNodes[j];
+
+                    const dx = nodeB.x - nodeA.x;
+                    const dy = nodeB.y - nodeA.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy) || 0.1;
+
+                    if (distance < planetRadius * 2) {
+                        const nx = dx / distance;
+                        const ny = dy / distance;
+                        const impulse = (planetRadius * 2 - distance) * bounceForce;
+
+                        nodeA.vx -= nx * impulse;
+                        nodeA.vy -= ny * impulse;
+                        nodeB.vx += nx * impulse;
+                        nodeB.vy += ny * impulse;
+                    }
+                }
+            }
+        }
+
+        // 4. Mise à jour des forces physiques
+        function updateLiveParameters() {
+            drawDensityMap();
+
+            if (simulation) {
+                const friction = parseFloat(frictionSlider.value);
+
+                // Application de la force d'attraction individuelle réglable de chaque point jaune
+                simulation
+                    .force("sun_attraction", d3.forceManyBody().strength(d => {
+                        // Seuls les points jaunes (fx != undefined) exercent de l'attraction gravitationnelle
+                        return d.fx !== undefined ? d.attraction : 0;
+                    }))
+                    .force("center", d3.forceCenter(centerX, centerY).strength(0.01))
+                    .velocityDecay(friction);
+
+                simulation.alpha(0.3).restart();
+            }
+        }
+
+        // 5. Initialisation
+        function startSimulation() {
+            if (simulation) simulation.stop();
+
+            const totalSuns = parseInt(sunSlider.value);
+            const totalPlanets = parseInt(planetSlider.value);
+            const baseAttraction = parseFloat(attractionSlider.value);
+
+            // Création des points jaunes (attracteurs fixes)
+            sunNodes = [];
+            if (totalSuns === 1) {
+                sunNodes.push({ id: 'sun_0', x: centerX, y: centerY, fx: centerX, fy: centerY, r: 12, attraction: baseAttraction });
+            } else {
+                for (let i = 0; i < totalSuns; i++) {
+                    const angle = (i / totalSuns) * Math.PI * 2;
+                    const x = centerX + Math.cos(angle) * 120;
+                    const y = centerY + Math.sin(angle) * 120;
+                    sunNodes.push({ id: `sun_${i}`, x: x, y: y, fx: x, fy: y, r: 10, attraction: baseAttraction });
+                }
+            }
+
+            layerSun.selectAll("circle")
+                .data(sunNodes)
+                .join("circle")
+                .attr("class", "sun-point")
+                .attr("r", d => d.r)
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            // Création des points verts
+            planetNodes = [];
+            for (let i = 0; i < totalPlanets; i++) {
+                planetNodes.push({
+                    id: `planet_${i}`,
+                    x: Math.random() * (width - 100) + 50,
+                    y: Math.random() * (height - 100) + 50
+                });
+            }
+
+            layerPlanet.selectAll("circle")
+                .data(planetNodes, d => d.id)
+                .join("circle")
+                .attr("class", "planet-point")
+                .attr("r", 6)
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            // Moteur de Physique
+            simulation = d3.forceSimulation([...sunNodes, ...planetNodes]);
+
+            updateLiveParameters();
+
+            // Boucle physique frame par frame
+            simulation.on("tick", () => {
+                checkCollisionsAndAbsorb();
+
+                layerPlanet.selectAll("circle")
+                    .attr("cx", d => d.x)
+                    .attr("cy", d => d.y);
+
+                updateVoronoi();
+            });
+        }
+
+        setupSliderListeners();
+        playBtn.addEventListener('click', startSimulation);
+
+    </script>
+    <!-- ==================== FIN JAVASCRIPT ==================== -->
+</body>
+</html>
